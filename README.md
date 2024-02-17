@@ -1,1 +1,1 @@
-# syst-me-de-rideaux-automatis-s
+# systeme-de-rideaux-automatises
