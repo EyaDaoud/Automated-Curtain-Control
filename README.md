@@ -3,7 +3,7 @@
 
   
 Bienvenue sur mon projet !
-</div>
+
 ![Image de Fond](background.jpg)
 
-
+</div>
