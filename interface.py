@@ -20,7 +20,6 @@ def publish_message(topic,message):
     publish.single(topic, message, hostname=host)
 
 
-
 def on_subscribe(client, userdata, mid, granted_qos):
     print("Subscribed with QoS", granted_qos[0])
 
@@ -67,8 +66,7 @@ def subscribe_topic():
     subscribe_topic = subscribe_entry.get()
     subscribe_client.subscribe(subscribe_topic)
 
-
-                          
+               
 # Function to publish in the MQTT broker    
 def publish_command(topic,command):
     publish.single(topic, command, hostname="broker.hivemq.com")  # Remplacez "broker.example.com" par l'adresse de votre broker MQTT
@@ -85,7 +83,6 @@ def toggle_auto_mode():
 def open_curtains ():
     publish_command("manuell","ON")
     auto_mode.set(False)
-
 
 
 def close_curtains():
