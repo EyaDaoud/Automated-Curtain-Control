@@ -9,18 +9,25 @@
 #define GREEN_PIN 14
 #define BLUE_PIN 26
 
-const int servoPin = 23; // Define the servo motor pin
-const int ldrPin = 32;   // Broche du capteur LDR
-const int pirPin = 5;   // Broche du capteur PIR
+const int servoPin = 23; 
+const int ldrPin = 32;   
+const int pirPin = 5;  
+
 int pirState = LOW;
 int lastPirState = LOW;
 int previousLdrvalue = 0;
+int lum;
+int timeOuv;
+int timeFerm;
 
-bool etat = false; // fermé
+bool etat = false; 
 bool automatique = true;
 bool ouv = false ;
 bool manuel = false;
 bool oui = false;
+
+String msgStr = ""; // MQTT message buffer
+String msgStr1 = "";     
 
 const char* ssid = "Wokwi-GUEST";
 const char* password = "";
@@ -31,16 +38,11 @@ String stMac;
 char mac[50];
 char clientId[50];
 
-String msgStr = "";      // MQTT message buffer
-int lum;
-int timeOuv;
-int timeFerm;
-
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 RTC_DS1307 rtc;
-Servo myservo; // Create a Servo object
+Servo myservo; 
 
 
 
@@ -73,10 +75,9 @@ void setup() {
   pinMode(RED_PIN, OUTPUT);
   pinMode(GREEN_PIN, OUTPUT);
   pinMode(BLUE_PIN, OUTPUT);
-  pinMode(ldrPin, INPUT); // Déclaration de la broche de du LDR
-  myservo.attach(servoPin, 500, 2400);  // Attach the servo to the pin
+  pinMode(ldrPin, INPUT); 
+  myservo.attach(servoPin, 500, 2400); 
   rtc.begin();
-  //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   DateTime now = rtc.now();
 
 }
@@ -102,11 +103,10 @@ void mqttReconnect() {
       client.subscribe("etat");
       client.subscribe("manuell");
       client.subscribe("auto");
-      client.subscribe("lum");
-      //client.subscribe("lumi");
       client.subscribe("time_ouv");
       client.subscribe("time_ferm");
       client.subscribe("possible");
+      client.subscribe("mode");
 
       Serial.println("Topic Subscribed");
     } else {
@@ -134,8 +134,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
     lum = data.toInt();
     Serial.println(lum);
   }
-
-  if (String(topic) == "manuell") {
+  
+  if (String(topic) == "manuell") { //manual mode
     if (data == "ON") {
       automatique = false;
       manuel = true;
@@ -148,7 +148,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
   }
 
-  if (String(topic) == "auto") {
+  if (String(topic) == "auto") { //automatic mode
     if (data == "ON") {
       automatique = true;
       manuel = false;
@@ -156,12 +156,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 
 
-  if (String(topic) == "time_ouv") {
+  if (String(topic) == "time_ouv") { // Opening Hour
     timeOuv = data.toInt();
     Serial.println(timeOuv);
   }
 
-  if (String(topic) == "time_ferm") {
+  if (String(topic) == "time_ferm") { //Closing Hour
     timeFerm = data.toInt();
     Serial.println(timeFerm);
   }
@@ -181,7 +181,7 @@ void loop() {
     Serial.print("LDR Value :");
     Serial.println(currentLdrValue);
     char buffer[16];
-    sprintf(buffer, "%d", currentLdrValue); // Convert integer to string
+    sprintf(buffer, "%d", currentLdrValue); 
     client.publish("lum", buffer);
     previousLdrvalue = currentLdrValue;
 
@@ -196,21 +196,21 @@ void loop() {
   Serial.println(now.second(), DEC);
 
 
-  // Check for changes in the PIR sensor state
+  
   if (pirState != lastPirState && automatique == true) {
     if (pirState == HIGH ) {
       // Motion detected
       if (now.hour() >= timeOuv && now.hour() < 12 && now.minute() >= 0
           && now.second() >= 0 && etat == false )
-      {
+      { 
         for (int pos = 180; pos >= 0; pos -= 1) {
           myservo.write(pos);
           delay(20);
         }
         etat = true;
         analogWrite(GREEN_PIN, 255);
-        Serial.println("ouvert");
-        msgStr = "ouvert";
+        Serial.println("Temps d'ouverture dépassé: ouvert");
+        msgStr = "Opened";
         byte arrSize = msgStr.length() + 1;
         char msg[arrSize];
         Serial.print("PUBLISH DATA: ");
@@ -218,28 +218,41 @@ void loop() {
         msgStr.toCharArray(msg, arrSize);
         client.publish("etat", msg);
         msgStr = "";
+
+        msgStr1 = "Opening Hour Exceeded";
+          byte arrSize1 = msgStr1.length() + 1;
+      char msg1[arrSize1];
+      Serial.print("PUBLISH DATA: ");
+      Serial.println(msgStr1);
+      msgStr1.toCharArray(msg1, arrSize1);
+      client.publish("possible", msg1);
+      msgStr1 = "";
+
         delay(1500);
         analogWrite(GREEN_PIN, 0);
 
-      } else if (now.hour() >= 12 && now.hour() < 14  && now.minute() >= 0
+      } else if (now.hour() >= 12 && now.hour() < timeFerm  && now.minute() >= 0
                  && now.second() >= 0)
-      {
-        if (etat == false && (analogRead(ldrPin) - 4063) < lum ) {
-          //while (analogRead(ldrPin) < 500) {
+      { Serial.println(etat);
+      Serial.println(lum);
+        if (etat == false && abs(analogRead(ldrPin) - 4063) < lum ) {
+          // the amount of room brightness is less than the brightness required
+          // and the curtains are closed
           for (int pos = 180; pos >= 0; pos -= 1)
           {
+
             if (abs(analogRead(ldrPin) - 4063) < lum ) {
               delay(30);
               myservo.write(pos);
-              Serial.println("yet7al");
+              Serial.println("Opening Loading");
               Serial.println(analogRead(ldrPin));
             }
-            //delay(30);
+            
           }
           etat = true;
           analogWrite(BLUE_PIN, 255);
-          Serial.println("semi ouvert");
-          msgStr = "semi ouvert";
+          Serial.println("semi ouvert1");
+          msgStr = "Opened";
           byte arrSize = msgStr.length() + 1;
           char msg[arrSize];
           Serial.print("PUBLISH DATA: ");
@@ -247,12 +260,24 @@ void loop() {
           msgStr.toCharArray(msg, arrSize);
           client.publish("etat", msg);
           msgStr = "";
+
+          msgStr1 = "Brightness Required Attained";
+          byte arrSize1 = msgStr1.length() + 1;
+          char msg1[arrSize1];
+          Serial.print("PUBLISH DATA: ");
+          Serial.println(msgStr1);
+          msgStr1.toCharArray(msg1, arrSize1);
+          client.publish("possible", msg1);
+          msgStr1 = "";
+
           delay(2000);
           analogWrite(BLUE_PIN, 0);
         }
-        else if (etat == false && (analogRead(ldrPin) - 4063) > lum ) {
+        else if (etat == false && abs(analogRead(ldrPin) - 4063) > lum ) {
+           // the amount of room brightness is more than the brightness required
+          // and the curtains are closed
           Serial.println("les rideaux sont déja fermés");
-          msgStr = "les rideaux sont déja fermés";
+          msgStr = "Curtains Already Closed";
           byte arrSize = msgStr.length() + 1;
           char msg[arrSize];
           Serial.print("PUBLISH DATA: ");
@@ -262,20 +287,21 @@ void loop() {
           msgStr = "";
 
         }
-        else if (etat == true && (analogRead(ldrPin) - 4063) > lum ) {
-          //while (analogRead(ldrPin) > 500){
+        else if (etat == true && abs(analogRead(ldrPin) - 4063) > lum ) {
+          // the amount of room brightness is more than the brightness required
+          // and the curtains are opened
           for (int pos = 0; pos <= 180; pos += 1) {
             if (abs(analogRead(ldrPin) - 4063) > lum ) {
               delay(30);
               myservo.write(pos);
-              Serial.println("yetsaker");
+              Serial.println("Closing Loading");
               Serial.println(analogRead(ldrPin));
             }
           }
           etat = true;
           analogWrite(BLUE_PIN, 255);
           Serial.println("semi ouvert");
-          msgStr = "semi ouvert";
+          msgStr = "Opened";
           byte arrSize = msgStr.length() + 1;
           char msg[arrSize];
           Serial.print("PUBLISH DATA: ");
@@ -283,12 +309,24 @@ void loop() {
           msgStr.toCharArray(msg, arrSize);
           client.publish("etat", msg);
           msgStr = "";
+
+           msgStr1 = "Brightness Required Attained";
+          byte arrSize1 = msgStr1.length() + 1;
+          char msg1[arrSize1];
+          Serial.print("PUBLISH DATA: ");
+          Serial.println(msgStr1);
+          msgStr1.toCharArray(msg1, arrSize1);
+          client.publish("possible", msg1);
+          msgStr1 = "";
+
           delay(2000);
           analogWrite(BLUE_PIN, 0);
         }
-        else if (etat == true && (analogRead(ldrPin) - 4063) < lum ) {
+        else if (etat == true && abs(analogRead(ldrPin) - 4063) < lum ) {
+          // the amount of room brightness is less than the brightness required
+          // and the curtains are opened
           Serial.println("les rideaux sont déja ouverts");
-          msgStr = "les rideaux sont déja ouverts";
+          msgStr = "Curtains Already Opened";
           byte arrSize = msgStr.length() + 1;
           char msg[arrSize];
           Serial.print("PUBLISH DATA: ");
@@ -307,8 +345,8 @@ void loop() {
           }
         }
         analogWrite(RED_PIN, 255);
-        Serial.println("fermé");
-        msgStr = "fermé";
+        Serial.println("fermé : heure de fermeture dépassée");
+        msgStr = "Closed";
         byte arrSize = msgStr.length() + 1;
         char msg[arrSize];
         Serial.print("PUBLISH DATA: ");
@@ -316,6 +354,16 @@ void loop() {
         msgStr.toCharArray(msg, arrSize);
         client.publish("etat", msg);
         msgStr = "";
+
+        msgStr1 = "Closing Hour Attained";
+        byte arrSize1 = msgStr1.length() + 1;
+        char msg1[arrSize1];
+        Serial.print("PUBLISH DATA: ");
+        Serial.println(msgStr1);
+        msgStr1.toCharArray(msg1, arrSize1);
+        client.publish("possible", msg1);
+        msgStr1 = "";
+        
         delay(1500);
         analogWrite(RED_PIN, 0);
       }
@@ -334,7 +382,7 @@ void loop() {
         etat = false;
         analogWrite(RED_PIN, 255);
         Serial.println("aucune personne : fermé");
-        msgStr = "aucune personne : fermé";
+        msgStr = "Closed";
         byte arrSize = msgStr.length() + 1;
         char msg[arrSize];
         Serial.print("PUBLISH DATA: ");
@@ -342,6 +390,16 @@ void loop() {
         msgStr.toCharArray(msg, arrSize);
         client.publish("etat", msg);
         msgStr = "";
+
+        msgStr1 = "No Motion Detected";
+        byte arrSize1 = msgStr1.length() + 1;
+        char msg1[arrSize1];
+        Serial.print("PUBLISH DATA: ");
+        Serial.println(msgStr1);
+        msgStr1.toCharArray(msg1, arrSize1);
+        client.publish("possible", msg1);
+        msgStr1 = "";
+
         delay(1500);
         analogWrite(RED_PIN, 0);
       }
@@ -350,8 +408,20 @@ void loop() {
   }
 
 
-  if (manuel == true && automatique == false) {
-    if (  ouv == true) {
+  if (manuel == true && automatique == false) { // Manual mode activated 
+       Serial.println("Mode Manuel Activé");
+
+      msgStr1 = "Manual Mode Activated";
+      byte arrSize1 = msgStr1.length() + 1;
+      char msg1[arrSize1];
+      Serial.print("PUBLISH DATA: ");
+      Serial.println(msgStr1);
+      msgStr1.toCharArray(msg1, arrSize1);
+      client.publish("mode", msg1);
+      msgStr1 = "";
+
+    if ( ouv == true) {
+
       for (int pos = 180; pos >= 0; pos -= 1) {
         myservo.write(pos);
         delay(30);
@@ -359,7 +429,7 @@ void loop() {
       etat = true;
       analogWrite(GREEN_PIN, 255);
       Serial.println("ouvert");
-      msgStr = "ouvert";
+      msgStr = "Opened";
       byte arrSize = msgStr.length() + 1;
       char msg[arrSize];
       Serial.print("PUBLISH DATA: ");
@@ -367,10 +437,12 @@ void loop() {
       msgStr.toCharArray(msg, arrSize);
       client.publish("etat", msg);
       msgStr = "";
+    
       delay(1500);
       analogWrite(GREEN_PIN, 0);
       manuel = false;
       oui = false;
+      lastPirState = HIGH;
     }
     if (ouv == false  && oui == true )
     {
@@ -380,7 +452,7 @@ void loop() {
         delay(30);
       }
       etat = false;
-      msgStr = "les ridaux sont fermés";
+      msgStr = "Closed";
       byte arrSize = msgStr.length() + 1;
       char msg[arrSize];
       Serial.print("PUBLISH DATA: ");
@@ -388,12 +460,26 @@ void loop() {
       msgStr.toCharArray(msg, arrSize);
       client.publish("etat", msg);
       msgStr = "";
+
       delay(1500);
       analogWrite(RED_PIN, 0);
       oui = false ;
     }
   }
-  delay(1000); // This delay speeds up the simulation
+
+  if (manuel == false && automatique == true){ //Automatic Mode Activated
+    Serial.println("Mode automatique Activé");
+    msgStr1 = "Automatic Mode Activated";
+      byte arrSize1 = msgStr1.length() + 1;
+      char msg1[arrSize1];
+      Serial.print("PUBLISH DATA: ");
+      Serial.println(msgStr1);
+      msgStr1.toCharArray(msg1, arrSize1);
+      client.publish("mode", msg1);
+      msgStr1 = "";
+
+  }
+  delay(1000); 
 }
 
 
