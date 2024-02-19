@@ -35,7 +35,8 @@ This project involves an ESP32-based automated curtain control system that uses 
 
 3. Configure Simulation Settings:
    - Open the simulation in Wokwi and configure any simulation-specific settings.
-4. * Run the code of the:*
+     
+4. Run the code of the interface:
    - Open a new python file write the code and run it. 
 
 5. Run the Simulation:
@@ -43,14 +44,14 @@ This project involves an ESP32-based automated curtain control system that uses 
    - Use the GUI to see the changes in the simulation in wokwi 
 ## MQTT Topics
 
-- pir: Motion detection status
-- ldr: LDR sensor readings
 - etat: Curtain status updates
 - manuell: Manual mode control
 - auto: Automatic mode control
 - lum: Luminosity sensor readings
 - time_ouv: Opening time setting
 - time_ferm: Closing time setting
+- mode : automatic and manual mode
+- possible 
 
 ## Usage
 
@@ -61,7 +62,7 @@ This project involves an ESP32-based automated curtain control system that uses 
 ## Wokwi Simulation
 
 - The project is configured for simulation on the Wokwi platform.
-- Visit [Wokwi](https://wokwi.com/) and open the project to run the simulation.
+- Visit [[Wokwi](https://wokwi.com/)](https://wokwi.com/projects/390099968992321537) and open the project to run the simulation.
 
 ## Prerequisites
 
@@ -78,8 +79,6 @@ Install the dependencies using:
 pip install tk
 pip install paho-mqtt
   
-Bienvenue sur mon projet !
 
-![Image de Fond](background.jpg)
 
 </div>
