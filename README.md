@@ -1,5 +1,3 @@
-<div style="background-color: #ffb6c1; padding: 20px;">
-
   # ESP32 Automated-Curtain-Control
 This project involves an ESP32-based automated curtain control system that uses sensors and actuators to adjust the curtain position based on environmental conditions and user preferences.
 
@@ -80,5 +78,3 @@ pip install tk
 pip install paho-mqtt
   
 
-
-</div>
